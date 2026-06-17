@@ -44,7 +44,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         try:
             return await client.async_get_upcoming_appointments()
         except TendAuthError as err:
-            raise ConfigEntryAuthFailed("Tend authentication failed") from err
+            raise ConfigEntryAuthFailed(str(err)) from err
         except TendApiError as err:
             raise UpdateFailed(str(err)) from err
 

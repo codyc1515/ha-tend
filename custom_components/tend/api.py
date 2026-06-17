@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import base64
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+import json
 import logging
 from typing import Any
 
@@ -196,7 +198,7 @@ class TendApiClient:
         self.refresh_token = refresh_token
         self.id_token = id_token
         self.access_token = access_token
-        self.expires_at = expires_at
+        self.expires_at = _jwt_expires_at(id_token) or expires_at
         self._token_update_callback = token_update_callback
 
     async def async_start_login(self) -> TendLoginChallenge:
@@ -403,14 +405,15 @@ class TendApiClient:
             raise TendAuthError("Tend did not return authentication tokens")
 
         expires_in = int(result.get("ExpiresIn", 3600))
-        expires_at = (datetime.now(UTC) + timedelta(seconds=expires_in)).timestamp()
 
         self.access_token = result.get("AccessToken")
         self.id_token = result.get("IdToken")
         self.refresh_token = result.get("RefreshToken") or (
             self.refresh_token if keep_existing_refresh_token else None
         )
-        self.expires_at = expires_at
+        self.expires_at = _jwt_expires_at(self.id_token) or (
+            datetime.now(UTC) + timedelta(seconds=expires_in)
+        ).timestamp()
 
         if not self.id_token or not self.refresh_token:
             raise TendAuthError("Tend authentication result was incomplete")
@@ -512,3 +515,19 @@ def _safe_cognito_debug(data: Any) -> dict[str, Any]:
         "message": data.get("message") or data.get("Message"),
         "challenge_parameters": sorted(challenge_parameters),
     }
+
+
+def _jwt_expires_at(token: str | None) -> float | None:
+    """Return the exp timestamp from a JWT without verifying its signature."""
+    if not token:
+        return None
+    try:
+        payload = token.split(".")[1]
+        padded_payload = payload + "=" * (-len(payload) % 4)
+        decoded = base64.urlsafe_b64decode(padded_payload.encode())
+        exp = json.loads(decoded).get("exp")
+    except (IndexError, ValueError, TypeError, json.JSONDecodeError):
+        return None
+    if isinstance(exp, (int, float)):
+        return float(exp)
+    return None
