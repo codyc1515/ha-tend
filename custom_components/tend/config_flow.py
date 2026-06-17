@@ -9,6 +9,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_NAME
+from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import TendApiClient, TendApiError, TendAuthError, TendLoginChallenge
@@ -39,6 +40,7 @@ class TendConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._email = user_input[CONF_EMAIL].strip().lower()
             await self.async_set_unique_id(self._email)
             self._abort_if_unique_id_configured()
+            self._abort_if_email_configured(self._email)
 
             client = TendApiClient(async_get_clientsession(self.hass), email=self._email)
             try:
@@ -98,7 +100,7 @@ class TendConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, entry_data: dict[str, Any]
     ) -> config_entries.ConfigFlowResult:
         """Handle reauthentication."""
-        self._email = entry_data[CONF_EMAIL]
+        self._email = entry_data[CONF_EMAIL].strip().lower()
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
@@ -144,7 +146,7 @@ class TendConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_update_reload_and_abort(
                     self._get_reauth_entry(),
-                    data_updates=self._tokens,
+                    data_updates={CONF_EMAIL: self._email, **self._tokens},
                 )
 
         return self.async_show_form(
@@ -153,3 +155,9 @@ class TendConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={"email": self._email or ""},
         )
+
+    def _abort_if_email_configured(self, email: str) -> None:
+        """Abort if a Tend entry already exists for this email address."""
+        for entry in self._async_current_entries():
+            if entry.data.get(CONF_EMAIL, "").strip().lower() == email:
+                raise AbortFlow("already_configured")

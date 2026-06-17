@@ -357,7 +357,7 @@ class TendApiClient:
                 "Tend authentication failed "
                 f"({response.status}: {_cognito_error_message(data)})"
             )
-        except (ClientError, TimeoutError) as err:
+        except (ClientError, TimeoutError, json.JSONDecodeError) as err:
             raise TendApiError("Unable to reach Tend authentication service") from err
 
     async def _graphql(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -386,9 +386,11 @@ class TendApiClient:
             data = await response.json()
         except TendAuthError:
             raise
-        except (ClientError, TimeoutError) as err:
+        except (ClientError, TimeoutError, json.JSONDecodeError) as err:
             raise TendApiError("Unable to reach Tend API") from err
 
+        if not isinstance(data, dict):
+            raise TendApiError("Tend API returned an unexpected response")
         if errors := data.get("errors"):
             raise TendApiError(f"Tend GraphQL returned errors: {errors}")
         return data

@@ -25,6 +25,38 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old Tend config entries."""
+    email = entry.data[CONF_EMAIL].strip().lower()
+    data_updates = {}
+    if entry.data[CONF_EMAIL] != email:
+        data_updates[CONF_EMAIL] = email
+
+    duplicate_entries = [
+        current_entry
+        for current_entry in hass.config_entries.async_entries(DOMAIN)
+        if current_entry.entry_id != entry.entry_id
+        and current_entry.data.get(CONF_EMAIL, "").strip().lower() == email
+    ]
+    unique_id = entry.unique_id
+    if not duplicate_entries and (unique_id is None or unique_id.lower() == email):
+        unique_id = email
+    elif duplicate_entries:
+        _LOGGER.warning(
+            "Multiple Tend config entries exist for %s; remove duplicate entries to "
+            "keep one Tend instance per account",
+            email,
+        )
+
+    if entry.unique_id != unique_id or data_updates:
+        updates = {"data": {**entry.data, **data_updates}}
+        if entry.unique_id != unique_id:
+            updates["unique_id"] = unique_id
+        hass.config_entries.async_update_entry(entry, **updates)
+
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Tend from a config entry."""
     session = async_get_clientsession(hass)

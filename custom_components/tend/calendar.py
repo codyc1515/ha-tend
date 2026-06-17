@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import logging
 from typing import Any
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_EMAIL
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
+from .const import DOMAIN
+
 DEFAULT_APPOINTMENT_LENGTH = timedelta(minutes=15)
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -34,6 +40,12 @@ class TendCalendarEntity(CoordinatorEntity[DataUpdateCoordinator], CalendarEntit
         """Initialize the calendar entity."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry.entry_id}_appointments"
+        self._attr_device_info = DeviceInfo(
+            entry_type=DeviceEntryType.SERVICE,
+            identifiers={(DOMAIN, entry.unique_id or entry.data[CONF_EMAIL])},
+            manufacturer="Tend",
+            name=entry.title,
+        )
 
     @property
     def event(self) -> CalendarEvent | None:
@@ -64,7 +76,16 @@ class TendCalendarEntity(CoordinatorEntity[DataUpdateCoordinator], CalendarEntit
 
 def _appointments_to_events(appointments: list[dict[str, Any]]) -> list[CalendarEvent]:
     """Convert Tend appointments into Home Assistant calendar events."""
-    events = [_appointment_to_event(item) for item in appointments]
+    events = []
+    for item in appointments:
+        try:
+            events.append(_appointment_to_event(item))
+        except (KeyError, TypeError, ValueError) as err:
+            _LOGGER.warning(
+                "Skipping malformed Tend appointment %s: %s",
+                item.get("uid") or item.get("id") or "unknown",
+                err,
+            )
     return sorted(events, key=lambda event: event.start)
 
 
