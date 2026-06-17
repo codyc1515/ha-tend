@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Tend",
+        "description": "Enter the email address for your Tend account. Tend will send a login code.",
+        "data": {
+          "email": "Email"
+        }
+      },
+      "code": {
+        "title": "Enter Tend login code",
+        "description": "Enter the code Tend sent to {email}.",
+        "data": {
+          "code": "Code",
+          "name": "Name"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Tend",
+        "description": "Tend needs a new login code to refresh access."
+      },
+      "reauth_code": {
+        "title": "Enter Tend login code",
+        "description": "Enter the code Tend sent to {email}.",
+        "data": {
+          "code": "Code"
+        }
+      }
+    },
+    "error": {
+      "auth": "Tend did not accept the login request.",
+      "cannot_connect": "Could not connect to Tend.",
+      "invalid_code": "Tend did not accept that code."
+    },
+    "abort": {
+      "already_configured": "This Tend account is already configured."
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "domain": "tend",
+  "name": "Tend",
+  "after_dependencies": ["calendar"],
+  "codeowners": [ "codyc1515" ],
+  "config_flow": true,
+  "documentation": "https://github.com/codyc1515/ha-tend",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/codyc1515/ha-tend/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
