@@ -260,14 +260,28 @@ class TendApiClient:
         if not self.refresh_token:
             raise TendAuthError("No Tend refresh token is available")
 
-        response = await self._cognito(
-            "AWSCognitoIdentityProviderService.InitiateAuth",
-            {
-                "AuthFlow": "REFRESH_TOKEN_AUTH",
-                "ClientId": COGNITO_CLIENT_ID,
-                "AuthParameters": {"REFRESH_TOKEN": self.refresh_token},
-            },
-        )
+        try:
+            response = await self._cognito(
+                "AWSCognitoIdentityProviderService.InitiateAuth",
+                {
+                    "AuthFlow": "REFRESH_TOKEN_AUTH",
+                    "ClientId": COGNITO_CLIENT_ID,
+                    "AuthParameters": {"REFRESH_TOKEN": self.refresh_token},
+                },
+            )
+        except TendAuthError as err:
+            _LOGGER.info(
+                "Tend refresh with REFRESH_TOKEN_AUTH failed; trying "
+                "GetTokensFromRefreshToken: %s",
+                err,
+            )
+            response = await self._cognito(
+                "AWSCognitoIdentityProviderService.GetTokensFromRefreshToken",
+                {
+                    "ClientId": COGNITO_CLIENT_ID,
+                    "RefreshToken": self.refresh_token,
+                },
+            )
         self._store_authentication_result(response, keep_existing_refresh_token=True)
 
     async def async_get_upcoming_appointments(self) -> list[dict[str, Any]]:
