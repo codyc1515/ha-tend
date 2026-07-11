@@ -2,7 +2,7 @@
   "domain": "tend",
   "name": "Tend",
   "after_dependencies": ["calendar"],
-  "codeowners": [ "codyc1515" ],
+  "codeowners": [ "@codyc1515" ],
   "config_flow": true,
   "documentation": "https://github.com/codyc1515/ha-tend",
   "integration_type": "service",
