@@ -7,11 +7,15 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryError,
+    ConfigEntryNotReady,
+)
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import TendApiClient, TendApiError, TendAuthError
+from .api import TendApiClient, TendApiError, TendApiGoneError, TendAuthError
 from .const import (
     CONF_ACCESS_TOKEN,
     CONF_EXPIRES_AT,
@@ -75,6 +79,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def async_update_data() -> list:
         try:
             return await client.async_get_upcoming_appointments()
+        except TendApiGoneError as err:
+            raise ConfigEntryError(str(err)) from err
         except TendAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except TendApiError as err:
@@ -91,7 +97,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         await coordinator.async_config_entry_first_refresh()
-    except ConfigEntryAuthFailed:
+    except (ConfigEntryAuthFailed, ConfigEntryError):
         raise
     except Exception as err:
         raise ConfigEntryNotReady("Unable to connect to Tend") from err

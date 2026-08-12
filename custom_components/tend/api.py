@@ -169,6 +169,10 @@ class TendAuthError(TendApiError):
     """Raised when Tend authentication fails."""
 
 
+class TendApiGoneError(TendApiError):
+    """Raised when the Tend API endpoint has been permanently removed."""
+
+
 @dataclass(slots=True)
 class TendLoginChallenge:
     """Cognito login challenge details returned after Tend sends a code."""
@@ -381,6 +385,11 @@ class TendApiClient:
             if response.status in (401, 403):
                 response.release()
                 raise TendAuthError("Tend rejected the current token")
+            if response.status == 410:
+                response.release()
+                raise TendApiGoneError(
+                    "The Tend appointments API endpoint is no longer available"
+                )
             if response.status >= 400:
                 raise TendApiError(f"Tend API request failed: {response.status}")
             data = await response.json()
