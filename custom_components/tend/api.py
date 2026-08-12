@@ -25,6 +25,7 @@ from .const import (
 )
 
 GRAPHQL_URL = f"{API_BASE_URL}/patients/graphql"
+APP_UPDATE_URL = f"{API_BASE_URL}/public/recommend-app-update"
 _LOGGER = logging.getLogger(__name__)
 
 APPOINTMENTS_QUERY = """
@@ -170,7 +171,7 @@ class TendAuthError(TendApiError):
 
 
 class TendApiGoneError(TendApiError):
-    """Raised when the Tend API endpoint has been permanently removed."""
+    """Raised when the requested Tend API contract is no longer available."""
 
 
 @dataclass(slots=True)
@@ -204,6 +205,7 @@ class TendApiClient:
         self.access_token = access_token
         self.expires_at = _jwt_expires_at(id_token) or expires_at
         self._token_update_callback = token_update_callback
+        self._api_version_checked = False
 
     async def async_start_login(self) -> TendLoginChallenge:
         """Start the Tend code login flow and return the Cognito challenge."""
@@ -369,6 +371,8 @@ class TendApiClient:
         if not self.id_token:
             raise TendAuthError("No Tend id token is available")
 
+        await self._verify_api_version()
+
         try:
             response = await self._session.post(
                 GRAPHQL_URL,
@@ -388,7 +392,7 @@ class TendApiClient:
             if response.status == 410:
                 response.release()
                 raise TendApiGoneError(
-                    "The Tend appointments API endpoint is no longer available"
+                    f"Tend API version {API_VERSION} is no longer available"
                 )
             if response.status >= 400:
                 raise TendApiError(f"Tend API request failed: {response.status}")
@@ -403,6 +407,55 @@ class TendApiClient:
         if errors := data.get("errors"):
             raise TendApiError(f"Tend GraphQL returned errors: {errors}")
         return data
+
+    async def _verify_api_version(self) -> None:
+        """Check once whether Tend recommends updating the configured API version."""
+        if self._api_version_checked:
+            return
+        self._api_version_checked = True
+
+        try:
+            response = await self._session.get(
+                APP_UPDATE_URL,
+                headers={
+                    "Accept": f"application/vnd.tend.api+json;version={API_VERSION}",
+                    "User-Agent": f"Tend/{APP_BUILD}",
+                },
+                params={"versionNumber": APP_BUILD},
+                timeout=30,
+            )
+            if response.status == 410:
+                response.release()
+                raise TendApiGoneError(
+                    f"Tend API version {API_VERSION} is no longer available"
+                )
+            if response.status >= 400:
+                response.release()
+                _LOGGER.debug(
+                    "Unable to verify Tend API version %s: HTTP %s",
+                    API_VERSION,
+                    response.status,
+                )
+                return
+
+            data = await response.json()
+        except TendApiGoneError:
+            raise
+        except (ClientError, TimeoutError, json.JSONDecodeError) as err:
+            _LOGGER.debug(
+                "Unable to verify Tend API version %s", API_VERSION, exc_info=err
+            )
+            return
+
+        if (
+            isinstance(data, dict)
+            and isinstance(data.get("data"), dict)
+            and data["data"].get("recommendAppUpdate") is True
+        ):
+            _LOGGER.warning(
+                "Tend recommends updating API version %s; attempting to continue",
+                API_VERSION,
+            )
 
     def _store_authentication_result(
         self,
