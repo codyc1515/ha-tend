@@ -2,6 +2,20 @@
 
 This custom integration logs in to Tend and exposes one unified `calendar.tend_appointments` calendar.
 
+The **Look for new appointments** switch is off when the integration starts. Turning
+it on refreshes appointment data immediately and then every five minutes. Turning
+it off restores the usual six-hour refresh interval and stops fetching availability.
+
+While the switch is on, two sensors show the availability from the Tend home screen:
+
+- **Online Now wait time**: estimated appointment time as a timestamp, allowing
+  Home Assistant to display the wait as a relative time.
+- **Next available appointment**: the next bookable scheduled slot as a timestamp,
+  displayed in Home Assistant's configured timezone.
+
+Both sensors are unavailable while the switch is off. No available slot or wait
+estimate produces an unknown value; maintenance makes the affected sensor unavailable.
+
 ## Install
 
 1. Copy `custom_components/tend` into your Home Assistant `config/custom_components/` directory.

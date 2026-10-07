@@ -18,4 +18,5 @@ APP_VERSION = "2026.15.0"
 APP_BUILD = "1530"
 
 SCAN_INTERVAL = timedelta(hours=6)
-PLATFORMS = ["calendar"]
+APPOINTMENT_SEARCH_INTERVAL = timedelta(minutes=5)
+PLATFORMS = ["calendar", "sensor", "switch"]

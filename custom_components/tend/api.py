@@ -161,6 +161,25 @@ query AppointmentsScreenQuery($bookingFilter: AppointmentSearchInput!, $pastBook
 }
 """
 
+AVAILABILITY_QUERY = """
+query HomeScreenAvailability($slotInput: AppointmentSlotsInput!) {
+  maintenanceStatuses(ln: "en_NZ") {
+    standardBooking { isUnderMaintenance }
+    onlineNow { isUnderMaintenance }
+  }
+  nextAppointmentSlot(input: $slotInput) {
+    startTime
+  }
+  onlineNowQueue: appointmentQueueByShortCode(input: {shortCode: "online-now"}) {
+    waitTime {
+      estimatedAppointmentSlot {
+        startTime
+      }
+    }
+  }
+}
+"""
+
 
 class TendApiError(Exception):
     """Raised when the Tend API returns an error."""
@@ -322,6 +341,27 @@ class TendApiClient:
     async def async_validate_auth(self) -> None:
         """Validate the current credentials by fetching appointments."""
         await self.async_get_upcoming_appointments()
+
+    async def async_get_availability(self, from_date: datetime) -> dict[str, Any]:
+        """Return the home screen's scheduled slot and Online Now wait time."""
+        await self._ensure_valid_token()
+        response = await self._graphql(
+            {
+                "operationName": "HomeScreenAvailability",
+                "variables": {
+                    "slotInput": {
+                        "fromDate": from_date.astimezone(UTC)
+                        .isoformat(timespec="milliseconds")
+                        .replace("+00:00", "Z")
+                    }
+                },
+                "query": AVAILABILITY_QUERY,
+            }
+        )
+        data = response.get("data")
+        if not isinstance(data, dict):
+            raise TendApiError("Tend returned an unexpected availability response")
+        return data
 
     async def _ensure_valid_token(self) -> None:
         """Refresh tokens when the current id token is close to expiry."""

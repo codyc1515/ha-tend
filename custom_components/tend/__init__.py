@@ -13,7 +13,8 @@ from homeassistant.exceptions import (
     ConfigEntryNotReady,
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .api import TendApiClient, TendApiError, TendApiGoneError, TendAuthError
 from .const import (
@@ -25,6 +26,7 @@ from .const import (
     PLATFORMS,
     SCAN_INTERVAL,
 )
+from .coordinator import TendData, TendDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -76,9 +78,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ),
     )
 
-    async def async_update_data() -> list:
+    async def async_update_data() -> TendData:
         try:
-            return await client.async_get_upcoming_appointments()
+            appointments = await client.async_get_upcoming_appointments()
+            availability = None
+            if coordinator.look_for_new_appointments:
+                start_of_day = dt_util.now().replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+                availability = await client.async_get_availability(start_of_day)
+            return TendData(appointments, availability)
         except TendApiGoneError as err:
             raise ConfigEntryError(str(err)) from err
         except TendAuthError as err:
@@ -86,9 +95,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except TendApiError as err:
             raise UpdateFailed(str(err)) from err
 
-    coordinator = DataUpdateCoordinator(
+    coordinator = TendDataUpdateCoordinator(
         hass,
         _LOGGER,
+        config_entry=entry,
         name=DOMAIN,
         update_method=async_update_data,
         update_interval=SCAN_INTERVAL,

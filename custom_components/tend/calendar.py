@@ -53,7 +53,9 @@ class TendCalendarEntity(CoordinatorEntity[DataUpdateCoordinator], CalendarEntit
         now = dt_util.now()
         events = [
             event
-            for event in _appointments_to_events(self.coordinator.data or [])
+            for event in _appointments_to_events(
+                self.coordinator.data.appointments if self.coordinator.data else []
+            )
             if event.end > now
         ]
         if not events:
@@ -69,7 +71,9 @@ class TendCalendarEntity(CoordinatorEntity[DataUpdateCoordinator], CalendarEntit
         """Return calendar events within a datetime range."""
         return [
             event
-            for event in _appointments_to_events(self.coordinator.data or [])
+            for event in _appointments_to_events(
+                self.coordinator.data.appointments if self.coordinator.data else []
+            )
             if event.end > start_date and event.start < end_date
         ]
 
