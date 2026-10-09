@@ -8,7 +8,8 @@ from typing import Any
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -52,6 +53,37 @@ class TendAvailabilitySensor(CoordinatorEntity[TendDataUpdateCoordinator], Senso
         )
 
     @property
+    def entity_registry_visible_default(self) -> bool:
+        """Hide newly registered sensors until appointment search is enabled."""
+        return self.coordinator.look_for_new_appointments
+
+    async def async_added_to_hass(self) -> None:
+        """Apply search visibility to existing entities on setup too."""
+        await super().async_added_to_hass()
+        self._async_update_visibility()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Keep visibility in sync with the appointment search switch."""
+        self._async_update_visibility()
+        super()._handle_coordinator_update()
+
+    @callback
+    def _async_update_visibility(self) -> None:
+        """Manage integration hiding without overriding user-hidden entities."""
+        registry = er.async_get(self.hass)
+        entry = registry.async_get(self.entity_id)
+        if entry is None or entry.hidden_by == er.RegistryEntryHider.USER:
+            return
+        hidden_by = (
+            None
+            if self.coordinator.look_for_new_appointments
+            else er.RegistryEntryHider.INTEGRATION
+        )
+        if entry.hidden_by != hidden_by:
+            registry.async_update_entity(self.entity_id, hidden_by=hidden_by)
+
+    @property
     def availability_data(self) -> dict[str, Any]:
         """Return availability only while searches are enabled."""
         if not self.coordinator.look_for_new_appointments or not self.coordinator.data:
@@ -76,7 +108,7 @@ class TendAvailabilitySensor(CoordinatorEntity[TendDataUpdateCoordinator], Senso
 class TendOnlineNowSensor(TendAvailabilitySensor):
     """The API's estimated Online Now appointment time."""
 
-    _attr_name = "Online Now wait time"
+    _attr_name = "Online Now"
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_icon = "mdi:timer-outline"
     maintenance_key = "onlineNow"
@@ -105,7 +137,7 @@ class TendOnlineNowSensor(TendAvailabilitySensor):
 class TendNextAppointmentSensor(TendAvailabilitySensor):
     """The next bookable scheduled appointment shown on the Tend home screen."""
 
-    _attr_name = "Next available appointment"
+    _attr_name = "Next available"
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_icon = "mdi:calendar-clock"
     maintenance_key = "standardBooking"

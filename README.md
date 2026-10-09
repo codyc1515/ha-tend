@@ -8,12 +8,16 @@ it off restores the usual six-hour refresh interval and stops fetching availabil
 
 While the switch is on, two sensors show the availability from the Tend home screen:
 
-- **Online Now wait time**: estimated appointment time as a timestamp, allowing
+- **Online Now**: estimated appointment time as a timestamp, allowing
   Home Assistant to display the wait as a relative time.
-- **Next available appointment**: the next bookable scheduled slot as a timestamp,
+- **Next available**: the next bookable scheduled slot as a timestamp,
   displayed in Home Assistant's configured timezone.
 
-Both sensors are unavailable while the switch is off. No available slot or wait
+Both sensors are hidden while the switch is off and shown again when it is on.
+Sensors you manually hide stay hidden. Existing entity IDs remain unchanged.
+Home Assistant's hidden setting excludes sensors from automatically generated
+dashboards; explicitly configured cards need a visibility condition on the search
+switch to hide them too. No available slot or wait
 estimate produces an unknown value; maintenance makes the affected sensor unavailable.
 
 ## Install
